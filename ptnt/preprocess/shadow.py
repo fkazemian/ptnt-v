@@ -405,17 +405,20 @@ pure_measurement = {
 # Counts -> probabilities (endianness fixed)
 # Produces a long probability vector across all circuits and a parallel list of keys (strings) that were present. Reverse fixes qubit order conventions
 def shadow_results_to_data_vec(results, shots, nQ):
+    # Precompute the binary keys once to avoid repeated string allocations in the
+    # inner loop, and cache the normalization factor.
+    binary_keys = [np.binary_repr(i, nQ)[::-1] for i in range(2**nQ)]
+    inv_shots = 1.0 / shots
+
     data_vec = []
     data_keys = []
 
     for res in results:
         tmp = []
-        for i in range(2**nQ):
-            key = np.binary_repr(i, nQ)
-            key = key[::-1]
+        for key in binary_keys:
             p = res.get(key)
             if p is not None:
-                data_vec.append(p / shots)
+                data_vec.append(p * inv_shots)
                 tmp.append(key)
         data_keys.append(tmp)
     return data_vec, data_keys
@@ -430,22 +433,24 @@ def shadow_seqs_to_op_array(sequences, keys, measurements, unitaries):
     nQ = len(sequences[0])
     nUnique = sum([len(K) for K in keys])
 
-    seq_of_seqs = []
-    for i, S in enumerate(sequences):
-        for key in keys[i]:
-            tmp_nQ_seq = []
-            for j in range(nQ):
-                tmp_seq = []
-                tmp_seq.append(measurements[int(key[j])][S[j][0]])
-                for k in range(nsteps):
-                    tmp_seq.append(unitaries[S[j][k + 1]])
-                tmp_seq = np.concatenate(tmp_seq)
-                tmp_nQ_seq.append(tmp_seq)
-            tmp_nQ_seq = np.vstack(tmp_nQ_seq)
-            seq_of_seqs.append(tmp_nQ_seq)
+    # Convert once to numpy arrays without the leading singleton dimension so we
+    # can fill a preallocated buffer.
+    meas_lookup = {i: [np.asarray(m)[0] for m in meas_list] for i, meas_list in measurements.items()}
+    unitary_lookup = {i: np.asarray(u)[0] for i, u in unitaries.items()}
+    dtype = np.asarray(next(iter(unitary_lookup.values()))).dtype
 
-    final_shape = (nUnique, nQ, nsteps + 1, 2, 2)
-    return jnp.array(np.vstack(seq_of_seqs).reshape(*final_shape))
+    out = np.empty((nUnique, nQ, nsteps + 1, 2, 2), dtype=dtype)
+
+    sample_idx = 0
+    for seq, seq_keys in zip(sequences, keys):
+        for key in seq_keys:
+            for q_idx, ops in enumerate(seq):
+                out[sample_idx, q_idx, 0] = meas_lookup[int(key[q_idx])][ops[0]]
+                for t_idx, gate_idx in enumerate(ops[1:], start=1):
+                    out[sample_idx, q_idx, t_idx] = unitary_lookup[gate_idx]
+            sample_idx += 1
+
+    return jnp.array(out)
 
 
 # Sequences -> operator arrays (RZ-decomp)
@@ -461,23 +466,26 @@ def shadow_seqs_to_op_array_rz(sequences, keys, measurements, unitaries):
     nQ = len(sequences[0])
     nUnique = sum([len(K) for K in keys])
 
-    seq_of_seqs = []
-    for i, S in enumerate(sequences):
-        for key in keys[i]:
-            tmp_nQ_seq = []
-            for j in range(nQ):
-                tmp_seq = []
-                tmp_seq.append(measurements[int(key[j])])
-                for k in range(nsteps + 1):
-                    for n in range(3):
-                        tmp_seq.append(unitaries[S[j][k]][n])
-                tmp_seq = np.concatenate(tmp_seq)
-                tmp_nQ_seq.append(tmp_seq)
-            tmp_nQ_seq = np.vstack(tmp_nQ_seq)
-            seq_of_seqs.append(tmp_nQ_seq)
+    meas_lookup = {i: np.asarray(m)[0] for i, m in measurements.items()}
+    unitary_lookup = {i: [np.asarray(u)[0] for u in us] for i, us in unitaries.items()}
+    sample_unitaries = next(iter(unitary_lookup.values()))
+    dtype = np.asarray(sample_unitaries[0]).dtype
 
-    final_shape = (nUnique, nQ, 3 * (nsteps + 1) + 1, 2, 2)
-    return jnp.array(np.vstack(seq_of_seqs).reshape(*final_shape))
+    out = np.empty((nUnique, nQ, 3 * (nsteps + 1) + 1, 2, 2), dtype=dtype)
+
+    sample_idx = 0
+    for seq, seq_keys in zip(sequences, keys):
+        for key in seq_keys:
+            for q_idx, ops in enumerate(seq):
+                out[sample_idx, q_idx, 0] = meas_lookup[int(key[q_idx])]
+                pos = 1
+                for gate_idx in ops:
+                    gates = unitary_lookup[gate_idx]
+                    out[sample_idx, q_idx, pos : pos + 3] = gates
+                    pos += 3
+            sample_idx += 1
+
+    return jnp.array(out)
 
 
 def op_arrays_to_single_vector_TN_padded(op_seq):
