@@ -1,0 +1,44 @@
+# Reproduces "Figure 3" benchmark: NM-GST (X-decomposition) vs Standard ptnt
+seed: 123
+device:
+  backend: "aer_simulator_density_matrix"
+  basis_gates: ["cx", "rz", "sx", "x"]
+  noise:
+    depolarizing_p1q: 0.002
+    coherent_rx_angle: 0.09817477042468103    # pi/32
+pt:
+  n_qubits: 1
+  n_steps: 9
+  template: "dd_clifford"  # see ptnt.circuits.templates
+  env_IA: {rxx: 0.20943951, ryy: 0.20943951, rzz: 0.31415927}  # pi/15, pi/15, pi/10
+  crosstalk_IA: {rxx: 0.0, ryy: 0.0, rzz: 0.39269908}          # pi/8
+data:
+  n_jobs: 20
+  shadows_per_job: 300
+  shots_per_char: 1024
+  val_shadows: 300
+  shots_per_val: 16384
+training:
+  mode: "X_decomp"   # ["X_decomp", "normal"]
+  epochs: 600
+  batch_size: 1000
+  kappa: 1.0
+  optimizer: "adam"
+  autodiff: "jax"
+  opt: "greedy"          # safe, non-compressed contraction
+  causality_key_size: 200
+  refresh_causality_every: 50    # resample causality keys every 50 minibatches
+  horizontal_bonds: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+  vertical_bonds:
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+    - [1]
+  K_lists: [[1,1,1,1,1,1,1,1,1,1]]
+output:
+  dir: "runs/figure3"

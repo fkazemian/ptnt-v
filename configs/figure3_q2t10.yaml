@@ -1,0 +1,36 @@
+# configs/figure3_q2t10.yaml
+seed: 0
+
+pt:
+  n_qubits: 2          # ← 2 system qubits (env ancilla stays at wire 0)
+  n_steps: 10          # ← 10 time steps
+  template: dd_clifford
+  env_IA: { rxx: 0.4, ryy: 0.2, rzz: 0.3 }
+  # crosstalk_IA: { rxx: ..., ryy: ..., rzz: ... }  # optional
+
+device:
+  backend: aer_simulator
+  basis_gates: null
+  # noise:
+  #   depolarizing_p1q: 0.001
+  #   coherent_rx_angle: 0.01
+
+data:                    # You can trim these to keep walltime reasonable
+  jobs: 10               # default in your configs is often 20; 2× qubits increases work a lot
+  shadows_per_job: 300
+  shots_per_char: 1024
+  val_shadows: 300
+  shots_per_val: 16384
+
+training:
+  mode: X_decomp         # for deep-in-time circuits, RZ (“X_decomp”) is a lot faster
+  epochs: 1
+  batch_size: 64
+  kappa: 1.0e-3
+  autodiff: jax
+  optimizer: adam
+  causality_key_size: 16
+
+output:
+  dir: runs/q2_t10
+

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ptnt"
+version = "0.1.0"
+description = "Process Tensor Tomography (ptnt): reproducible pipelines for non-Markovian quantum process learning"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+  {name = "ptnt Contributors", email = "example@example.com"}
+]
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "quimb>=1.5",
+  "qiskit>=0.45",
+  "qiskit-aer>=0.13",
+  "jax>=0.4.23",
+  "tqdm>=4.66",
+  "matplotlib>=3.7",
+  "seaborn>=0.12",
+  "pyyaml>=6.0",
+]
+
+[project.scripts]
+ptnt = "ptnt.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ptnt"]

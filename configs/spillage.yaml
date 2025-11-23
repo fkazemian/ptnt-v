@@ -1,0 +1,31 @@
+# Spillage comparison benchmark
+seed: 7
+device:
+  backend: "aer_simulator_density_matrix"
+  basis_gates: ["cx", "rz", "sx", "x"]
+pt:
+  n_qubits: 1
+  n_steps: 5
+  template: "dd_spillage"
+  env_IA: {rxx: 0.20943951, ryy: 0.20943951, rzz: 0.31415927}
+  spillage:
+    control_rotation: 0.39269908169872414    # pi/8
+    init_qubits: [0]                          # use 0 to model classical leak proxy
+data:
+  val_shadows: 300
+  shadows_per_job: 300
+  jobs: 20
+  shots_per_val: 16384
+  shots_per_char: 1024
+training:
+  mode: "X_decomp"
+  epochs: 600
+  batch_size: 1000
+  kappa: 1.0
+  optimizer: "adam"
+  autodiff: "jax"
+  opt: "greedy"          # safe, non-compressed contraction
+  causality_key_size: 200
+  refresh_causality_every: 50    # resample causality keys every 50 minibatches
+output:
+  dir: "runs/spillage"

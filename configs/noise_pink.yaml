@@ -1,0 +1,32 @@
+# Synthetic coherent control noise with pink noise time-series
+seed: 42
+device:
+  backend: "aer_simulator_density_matrix"
+  basis_gates: ["cx", "rz", "sx", "x", "rx"]
+pt:
+  n_qubits: 1
+  n_steps: 4
+  template: "dd_rx_error"   # RZ-SX-RX(err)-... decomposition
+  env_IA: {rxx: 0.0, ryy: 0.0, rzz: 0.0}
+data:
+  val_circs: 300
+  char_circs: 3000
+  shots_per_val: 8192
+  shots_per_char: 1024
+  pink_noise:
+    enabled: true
+    sample_frequency: 1000.0
+    f_lower: 1.0e-5
+    max_angle: 0.7853981633974483   # pi/4
+training:
+  mode: "X_decomp"
+  epochs: 600
+  batch_size: 1000
+  kappa: 1.0
+  optimizer: "adam"
+  autodiff: "jax"
+  opt: "greedy"          # safe, non-compressed contraction
+  causality_key_size: 200
+  refresh_causality_every: 50    # resample causality keys every 50 minibatches
+output:
+  dir: "runs/noise_pink"
